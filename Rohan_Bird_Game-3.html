@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rohan Bird Game — Developed by Rohan</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#72cfff;font-family:Arial,sans-serif;touch-action:none}
+canvas{display:block;width:100%;height:100%}
+#hud{position:fixed;top:12px;left:0;right:0;text-align:center;color:#fff;font-weight:800;text-shadow:2px 2px 3px #555;pointer-events:none}
+#score{font-size:38px}
+#time{font-size:19px;margin-top:2px}
+#credit{position:fixed;bottom:10px;left:0;right:0;text-align:center;color:#fff;font-size:14px;font-weight:bold;text-shadow:1px 1px 2px #555;pointer-events:none}
+#msg{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:#fff;font-size:23px;font-weight:800;text-shadow:2px 2px 3px #555;white-space:pre-line;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="hud"><div id="score">0</div><div id="time">Time: 0:00</div></div>
+<div id="msg">TAP TO START</div>
+<div id="credit">Developed by Rohan</div>
+
+<script>
+const canvas=document.getElementById("canvas"),ctx=canvas.getContext("2d");
+let W,H,dpr,bird,pipes,score,started,over,frame,startTime,elapsed=0;
+
+function resize(){
+  dpr=Math.min(devicePixelRatio||1,2);
+  W=innerWidth; H=innerHeight;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  canvas.style.width=W+"px"; canvas.style.height=H+"px";
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+addEventListener("resize",resize); resize();
+
+function reset(){
+  bird={x:W*.25,y:H*.45,vy:0};
+  pipes=[];score=0;started=false;over=false;frame=0;elapsed=0;
+  document.getElementById("score").textContent="0";
+  document.getElementById("time").textContent="Time: 0:00";
+  document.getElementById("msg").textContent="TAP TO START";
+}
+function flap(){
+  if(over){reset();return}
+  if(!started){started=true;startTime=performance.now();document.getElementById("msg").textContent=""}
+  bird.vy=-6.1;
+}
+addEventListener("pointerdown",e=>{e.preventDefault();flap()});
+
+function makePipe(){
+  const gap=175, top=85+Math.random()*Math.max(80,H-330);
+  pipes.push({x:W+30,top,bottom:top+gap,passed:false});
+}
+
+function drawBird(){
+  ctx.save();ctx.translate(bird.x,bird.y);
+  ctx.rotate(Math.max(-.3,Math.min(.55,bird.vy*.04)));
+
+  // back wing
+  ctx.save();ctx.rotate(-.15+Math.sin(frame*.28)*.18);
+  ctx.fillStyle="#df9617";ctx.beginPath();
+  ctx.ellipse(-13,7,20,10,.3,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle="#9b650b";ctx.lineWidth=2;ctx.stroke();ctx.restore();
+
+  // body
+  const g=ctx.createLinearGradient(-18,-15,18,18);
+  g.addColorStop(0,"#ffe45b");g.addColorStop(1,"#f19a18");
+  ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(0,0,21,17,0,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle="#9b650b";ctx.lineWidth=2;ctx.stroke();
+
+  // front wing
+  ctx.save();ctx.rotate(.1+Math.sin(frame*.28)*.25);
+  ctx.fillStyle="#f5b52c";ctx.beginPath();
+  ctx.ellipse(-2,10,18,8,-.25,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle="#9b650b";ctx.stroke();ctx.restore();
+
+  // tail
+  ctx.fillStyle="#e99b15";ctx.beginPath();
+  ctx.moveTo(-18,-2);ctx.lineTo(-31,-9);ctx.lineTo(-27,3);
+  ctx.lineTo(-32,11);ctx.lineTo(-16,8);ctx.closePath();ctx.fill();
+
+  // eye
+  ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(10,-8,7,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle="#111";ctx.beginPath();ctx.arc(12,-8,3,0,Math.PI*2);ctx.fill();
+
+  // beak
+  ctx.fillStyle="#f07819";ctx.beginPath();
+  ctx.moveTo(18,-2);ctx.lineTo(32,3);ctx.lineTo(18,7);ctx.closePath();ctx.fill();
+
+  ctx.restore();
+}
+
+function drawPipe(p){
+  const g=ctx.createLinearGradient(p.x,0,p.x+55,0);
+  g.addColorStop(0,"#249d2b");g.addColorStop(.5,"#67d83c");g.addColorStop(1,"#168321");
+  ctx.fillStyle=g;
+  ctx.fillRect(p.x,0,55,p.top);
+  ctx.fillRect(p.x,p.bottom,55,H-p.bottom);
+  ctx.fillStyle="#168f22";
+  ctx.fillRect(p.x-7,p.top-22,69,22);
+  ctx.fillRect(p.x-7,p.bottom,69,22);
+}
+
+function hit(p){
+  const r=15;
+  return bird.x+r>p.x && bird.x-r<p.x+55 &&
+    (bird.y-r<p.top || bird.y+r>p.bottom);
+}
+function end(){
+  over=true;
+  document.getElementById("msg").textContent="GAME OVER\nTAP TO RESTART";
+}
+function update(){
+  if(!started||over)return;
+  elapsed=Math.floor((performance.now()-startTime)/1000);
+  document.getElementById("time").textContent=
+    "Time: "+Math.floor(elapsed/60)+":"+String(elapsed%60).padStart(2,"0");
+  frame++;
+  bird.vy+=.32;bird.y+=bird.vy;
+  if(frame%120===0)makePipe();
+  pipes.forEach(p=>{
+    p.x-=2.35;
+    if(!p.passed&&p.x+55<bird.x){
+      p.passed=true;score++;
+      document.getElementById("score").textContent=score;
+    }
+    if(hit(p))end();
+  });
+  pipes=pipes.filter(p=>p.x>-80);
+  if(bird.y<0||bird.y>H)end();
+}
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  const sky=ctx.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0,"#59c9ff");sky.addColorStop(1,"#d7f5ff");
+  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+  ctx.fillStyle="rgba(255,255,255,.72)";
+  for(let i=0;i<4;i++){
+    const x=(i*150-(frame*.2)%180),y=100+(i%2)*150;
+    ctx.beginPath();ctx.arc(x,y,22,0,Math.PI*2);
+    ctx.arc(x+25,y-9,29,0,Math.PI*2);
+    ctx.arc(x+53,y,22,0,Math.PI*2);ctx.fill();
+  }
+  pipes.forEach(drawPipe);drawBird();
+}
+function loop(){update();draw();requestAnimationFrame(loop)}
+reset();loop();
+</script>
+</body>
+</html>
